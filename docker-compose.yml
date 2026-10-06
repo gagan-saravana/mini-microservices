@@ -1,0 +1,51 @@
+services:
+  nginx:
+    image: nginx:1.27-alpine
+    ports: ["8080:80"]
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ui:/usr/share/nginx/html:ro
+    depends_on: [api]
+
+  # process_A x2 (docker DNS returns both container IPs for "api"; nginx round-robins)
+  api:
+    build: ./app
+    command: uvicorn api:app --host 0.0.0.0 --port 8000
+    environment: &env
+      RABBIT_URL: amqp://guest:guest@rabbitmq:5672/
+      DATABASE_URL: postgresql://app:app@postgres:5432/app   # swap for your Supabase URL
+      REDIS_URL: redis://redis:6379/0
+      WORKER_DELAY: "2"        # seconds of fake processing, makes eventual consistency visible
+      FAIL_AFTER_DB: "0"       # 0..1 probability of crashing between DB write and cache write
+    deploy: { replicas: 2 }
+    depends_on: [rabbitmq, redis, postgres]
+
+  # process_B
+  worker:
+    build: ./app
+    command: python worker.py
+    environment: *env
+    depends_on:
+      rabbitmq: { condition: service_healthy }
+      postgres: { condition: service_healthy }
+      redis:    { condition: service_started }
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    ports: ["15672:15672"]     # UI: guest / guest
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      retries: 20
+
+  postgres:                    # DB #1: source of truth (Supabase is just hosted Postgres)
+    image: postgres:16-alpine
+    environment: { POSTGRES_USER: app, POSTGRES_PASSWORD: app, POSTGRES_DB: app }
+    volumes: ["./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app"]
+      interval: 3s
+      retries: 20
+
+  redis:                       # DB #2: fast read model (derived, disposable)
+    image: redis:7-alpine
