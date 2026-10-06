@@ -1,4 +1,4 @@
-# mini-system
+# mini-microservices
 
 A small, runnable example of an asynchronous write pipeline and a cache-backed read path. It combines an HTTP API, a message broker, a background worker, PostgreSQL as the source of truth, and Redis as a disposable read cache. The project is intended to make service boundaries, eventual consistency, retries, and load balancing easy to observe.
 
