@@ -15,6 +15,16 @@ Click <b>read</b> on any row to read it again and see whether Redis or Postgres 
 Run <code>docker compose stop worker</code> and watch rows stay queued.
 <a href="http://localhost:15672" target="_blank">RabbitMQ UI</a></small></p>
 
+<section>
+  <h2>Experiments</h2>
+  <ol>
+    <li><code>docker compose stop worker</code>, send notes, then <code>docker compose start worker</code>.<br>While the worker is stopped, notes remain queued and reads return <code>404</code>. After it starts, the worker processes them and they become readable.</li>
+    <li><code>docker compose exec redis redis-cli FLUSHALL</code>, then click read.<br>The cache is empty, so the read falls back to PostgreSQL and reports <code>source: postgres</code>. The read path does not repopulate Redis.</li>
+    <li>Set <code>FAIL_AFTER_DB: "0.5"</code> in the compose file, then <code>docker compose up -d</code>.<br>Some messages fail after the database insert but before the cache update. RabbitMQ requeues them; retries safely skip the duplicate insert, refresh Redis, and eventually acknowledge the message.</li>
+    <li><code>docker compose up -d --scale worker=3</code>, then send 10 at once (competing consumers).<br>The workers consume messages concurrently, so notes should finish processing faster than with a single worker.</li>
+  </ol>
+</section>
+
 <input id="text" value="hello"> <button id="one">Send note</button> <button id="ten">Send 10 at once</button>
 
 <table>
