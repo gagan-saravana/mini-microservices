@@ -13,7 +13,7 @@ services:
     command: uvicorn api:app --host 0.0.0.0 --port 8000
     environment: &env
       RABBIT_URL: amqp://guest:guest@rabbitmq:5672/
-      DATABASE_URL: postgresql://app:app@postgres:5432/app   # swap for your Supabase URL
+      DATABASE_URL: postgresql://app:app@postgres:5432/app   
       REDIS_URL: redis://redis:6379/0
       WORKER_DELAY: "2"        # seconds of fake processing, makes eventual consistency visible
       FAIL_AFTER_DB: "0"       # 0..1 probability of crashing between DB write and cache write
